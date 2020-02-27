@@ -863,7 +863,7 @@ sub getCommandLineOptions
 # set cpus-per-task or ntasks-per-node
   if ($OPT{t}) {
     if ($OPT{t} eq "auto") {
-      $SLURMOPT{binary}{"cpus-per-task"} = 32;
+      $SLURMOPT{binary}{"cpus-per-task"} = 24;
     }
     else {
 # Don't be stupid
@@ -1003,6 +1003,9 @@ sub getCommandLineOptions
 #==============================================================================
 sub print_options
 {
+  # --noht                 don't use hyperthreading, equivalent to slurm option
+  #                        --threads-per-core=1
+
   print <<EOF;
 Usage: swarm [swarm options] [sbatch options]
 
@@ -1020,9 +1023,6 @@ Usage: swarm [swarm options] [sbatch options]
   --processes-per-subjob only valid for single-threaded swarms (-t 1).
   [int]                  
                       
-  --noht                 don't use hyperthreading, equivalent to slurm option
-                         --threads-per-core=1
-
   -b,--bundle [int]      bundle more than one command line per subjob and run
                          sequentially (this automatically multiplies the time
                          needed per subjob)
@@ -1104,6 +1104,7 @@ sub writeLog
           . "host="       .$PAR->{host}            ."; "
           . "jobid="      .$PAR->{jobid}           ."; "
           . "user="       .$PAR->{user}            ."; "
+          . "mygroup="    .$PAR->{mygroup}         ."; "
           . "pwd="        .$PAR->{pwd}             ."; "
           . "ncmds="      .$PAR->{commands}        ."; "
           . "soptions="   .$x                      ."; "
