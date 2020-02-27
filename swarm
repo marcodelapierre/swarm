@@ -109,9 +109,9 @@ sub setDefaults
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
 # RAM memory per core depends on the Pawsey system
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
-if ( $ENV{'PAWSEY_SYSTEM'} eq "magnus" ) {
+if ( $ENV{'PAWSEY_CLUSTER'} eq "magnus" ) {
   $PAR->{maxmemsize} = 2.5;
-} elsif ( $ENV{'PAWSEY_SYSTEM'} eq "zeus" ) {
+} elsif ( $ENV{'PAWSEY_CLUSTER'} eq "zeus" ) {
   $PAR->{maxmemsize} = 4.3;
 } else { # just some sensible default
   $PAR->{maxmemsize} = 1;
@@ -120,9 +120,9 @@ if ( $ENV{'PAWSEY_SYSTEM'} eq "magnus" ) {
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
 # Number of cores per node depends on the Pawsey system
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
-if ( $ENV{'PAWSEY_SYSTEM'} eq "magnus" ) {
+if ( $ENV{'PAWSEY_CLUSTER'} eq "magnus" ) {
   $PAR->{corespernode} = 24;
-} elsif ( $ENV{'PAWSEY_SYSTEM'} eq "zeus" ) {
+} elsif ( $ENV{'PAWSEY_CLUSTER'} eq "zeus" ) {
   $PAR->{corespernode} = 28;
 } else { # just some sensible default
   $PAR->{corespernode} = 16;
@@ -161,8 +161,8 @@ sub distributeCommands
       }
 # No bundling, but yes packing
       else {
-        $sj = (floor($i/2)) % $PAR->{maxarraysize};
-        $cpu = $i % 2;
+        $sj = (floor($i/$OPT{p})) % $PAR->{maxarraysize};
+        $cpu = $i % $OPT{p};
       }
     }
 # Yes bundling, but no packing
@@ -173,8 +173,8 @@ sub distributeCommands
       }
 # Yes bundling, and yes packing
       else {
-        $sj = (floor($i/(2*$PAR->{b}))) % $PAR->{maxarraysize};
-        $cpu = $i % 2;
+        $sj = (floor($i/($OPT{p}*$PAR->{b}))) % $PAR->{maxarraysize};
+        $cpu = $i % $OPT{p};
       }
     }
 # Add the command number to the list
@@ -186,7 +186,9 @@ sub distributeCommands
   foreach my $sj (0 .. $#{$SWARM->{CMDLISTS}}) {
     my $num_cmds_in_subjob=0;
     $num_cmds_in_subjob += scalar(@{${$SWARM->{CMDLISTS}}[$sj][0]});
-    $num_cmds_in_subjob += scalar(@{${$SWARM->{CMDLISTS}}[$sj][1]}) if (defined ${$SWARM->{CMDLISTS}}[$sj][1]);
+    foreach my $pid ( 1 ..  $OPT{p}-1) {
+      $num_cmds_in_subjob += scalar(@{${$SWARM->{CMDLISTS}}[$sj][$pid]}) if (defined ${$SWARM->{CMDLISTS}}[$sj][$pid]);
+    }
     $max = $num_cmds_in_subjob if ($num_cmds_in_subjob > $max);
   }
   $OPT{b} = $max;
@@ -220,8 +222,12 @@ sub report
   if (defined $OPT{p}) {
     $PAR->{cpus} *= $OPT{p};
   }
-  elsif ($OPT{t}) {
-    $PAR->{cpus} *= $OPT{t};
+  elsif ( $OPT{t} ) {
+    if ( $OPT{t} eq "auto" ) {
+      $PAR->{cpus} *= $PAR->{corespernode};
+    } else {
+      $PAR->{cpus} *= $OPT{t};
+    }
   }
 
 # Graphical representation of the swarm
@@ -237,7 +243,9 @@ sub report
 # How many commands will be run in this subjob?
     my $num_cmds_in_subjob=0;
     $num_cmds_in_subjob += scalar(@{${$SWARM->{CMDLISTS}}[$sj][0]});
-    $num_cmds_in_subjob += scalar(@{${$SWARM->{CMDLISTS}}[$sj][1]}) if (defined ${$SWARM->{CMDLISTS}}[$sj][1]);
+    foreach my $pid ( 1 ..  $OPT{p}-1) {
+      $num_cmds_in_subjob += scalar(@{${$SWARM->{CMDLISTS}}[$sj][$pid]}) if (defined ${$SWARM->{CMDLISTS}}[$sj][$pid]);
+    }
     if ($OPT{verbose} > 3) {
       printf ("%ssubjob %${len1}d: %${len2}d command%s (%d cpu%s, %.2f gb)\n",
         $top,
@@ -277,9 +285,7 @@ sub report
     if ($PAR->{b} > 1) {
       print ", running $PAR->{b} processes serially per subjob";
     }
-    if ((not defined $OPT{t}) || ($OPT{t} ne 'auto')) {
-      print ", allocating $PAR->{cpus} core".write_s_if_needed($PAR->{cpus});
-    }
+    print ", allocating $PAR->{cpus} core".write_s_if_needed($PAR->{cpus});
     if ($PAR->{multinode}) {
       print " across $PAR->{multinode} nodes each";
     }
@@ -379,7 +385,7 @@ sub writeBatchScript
   my $fileContents;
   my $len = length($#{$SWARM->{CMDLISTS}});
   my $len3 = length($OPT{p}) if $OPT{p};
-  $fileContents .= "#!/bin/bash\n";
+  $fileContents .= "#!/bin/bash -l\n";
 
 # The swarm.batch file loads the modules, and the command scripts will inherit the environment.  Thie
 # can be screwed up if the user fiddles with the environment within the commands.
@@ -666,9 +672,9 @@ sub avoidSbatchCommands
       }
 # Hopefully there is a zeroth argument
       next PROC unless $x;
-# Don't allow the swarm to call sbatch or sinteractive from within the swarm
-      if (($x eq 'sbatch') || ($x eq 'sinteractive')) {
-        dieWithError("do not call sbatch or sinteractive from a swarm");
+# Don't allow the swarm to call sbatch or salloc from within the swarm
+      if (($x eq 'sbatch') || ($x eq 'salloc')) {
+        dieWithError("do not call sbatch or salloc from a swarm");
       }
     }
   }
@@ -697,7 +703,6 @@ sub getCommandLineOptions
     "file=s"            => \$OPT{f},
     "b=i"               => \$OPT{b},
     "bundle=i"          => \$OPT{b},
-    "autobundle"        => \$OPT{autobundle},
     "g=f"               => \$OPT{g},
     "gb-per-process=f"  => \$OPT{g},
     "t=s"               => \$OPT{t},
@@ -756,8 +761,6 @@ sub getCommandLineOptions
   ) || exit 1;
 
   print_options() if $OPT{h};
-
-  if ($OPT{autobundle}) { print STDERR "WARNING: --autobundle has been deprecated\n"; }
 
 # Default account
   if (not defined $SLURMOPT{binary}{account}) {
@@ -856,7 +859,7 @@ sub getCommandLineOptions
   }
 
 # Default verbosity
-  $OPT{verbose} = 0 if (not defined $OPT{verbose});
+  $OPT{verbose} = 1 if (not defined $OPT{verbose});
 
 # Create a temporary name for the batch script and command script directory.
   (undef,$PAR->{tempname}) = tempfile('XXXXXXXXXX',OPEN => 0);
@@ -874,7 +877,7 @@ sub getCommandLineOptions
 # set cpus-per-task or ntasks-per-node
   if ($OPT{t}) {
     if ($OPT{t} eq "auto") {
-      $SLURMOPT{binary}{"cpus-per-task"} = 24;
+      $SLURMOPT{binary}{"cpus-per-task"} = $PAR->{corespernode};
     }
     else {
 # Don't be stupid
@@ -893,13 +896,13 @@ sub getCommandLineOptions
 
 # pack only allowed for single threaded swarms 
   if ($OPT{t} && $OPT{p}) {
-    if (($OPT{t} > 1) && ($OPT{p} > 1)) {
+    if (($OPT{t} > 1 || $OPT{t} eq "auto") && ($OPT{p} > 1)) {
       dieWithError("-t is for multi-threaded or multi-node commands, -p is for single-threaded commands.  Use one or the other!");
     }
   }
   undef $OPT{p} if ($OPT{p} <= 1);
 # Don't allow p to be more than 2
-  dieWithError("-p can't be more than 2.") if ($OPT{p} > 2);
+#  dieWithError("-p can't be more than 2.") if ($OPT{p} > 2);
 
 # Set qos
   if ($ENV{SBATCH_QOS} && (not defined $SLURMOPT{binary}{qos})) {
@@ -919,7 +922,7 @@ sub getCommandLineOptions
     dieWithError("-g must be between 0.1 and ".$PAR->{maxmemsize}) if (($OPT{g} <= 0.1) || ($OPT{g} > $PAR->{maxmemsize}));
   }
   else {
-    $OPT{g} = 2.5;
+    $OPT{g} = $PAR->{maxmemsize};
   }
   $SLURMOPT{binary}{"mem"} = ceil($OPT{g}*1024); 
 
@@ -1187,7 +1190,7 @@ sub adjustTime
   }
 
 # Die if the max_adjusted_time is too great
-  dieWithError("Total time for bundled commands is greater than partition walltime limit.\nTry lowering the time per command (--time=".seconds_to_clock($PAR->{requested_time})."), lowering the bundle factor\n(if not autobundled), picking another partition, or splitting up the swarmfile.") if ($max_adjusted_time > $PAR->{max_time});
+  dieWithError("Total time for bundled commands is greater than partition walltime limit.\nTry lowering the time per command (--time=".seconds_to_clock($PAR->{requested_time})."), lowering the bundle factor,\npicking another partition, or splitting up the swarmfile.") if ($max_adjusted_time > $PAR->{max_time});
 
 # Set time to the maximum amount
   $SLURMOPT{binary}{time} = seconds_to_clock($max_adjusted_time);
