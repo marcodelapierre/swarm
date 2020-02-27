@@ -107,9 +107,26 @@ sub setDefaults
   $PAR->{maxarraysize} = 1000;
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
-# Currently we have nodes with up to 2.5 GB of RAM memory per core
+# RAM memory per core depends on the Pawsey system
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
+if ( $ENV{'PAWSEY_SYSTEM'} eq "magnus" ) {
   $PAR->{maxmemsize} = 2.5;
+} elsif ( $ENV{'PAWSEY_SYSTEM'} eq "zeus" ) {
+  $PAR->{maxmemsize} = 4.3;
+} else { # just some sensible default
+  $PAR->{maxmemsize} = 1;
+}
+
+# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
+# Number of cores per node depends on the Pawsey system
+# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
+if ( $ENV{'PAWSEY_SYSTEM'} eq "magnus" ) {
+  $PAR->{corespernode} = 24;
+} elsif ( $ENV{'PAWSEY_SYSTEM'} eq "zeus" ) {
+  $PAR->{corespernode} = 28;
+} else { # just some sensible default
+  $PAR->{corespernode} = 16;
+}
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
 # In addition, we will not be concerned with QOS, as this will be handled downstream by slurm itself.
