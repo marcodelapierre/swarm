@@ -261,13 +261,7 @@ sub report
       print ", running $PAR->{b} processes serially per subjob";
     }
     if ((not defined $OPT{t}) || ($OPT{t} ne 'auto')) {
-# allocating by core, not by cpu
-      my $cpus = $SLURMOPT{binary}{"cpus-per-task"};
-      # print "pippo $cpus\n";
-      ($cpus%2) && $cpus++;
-      $cpus *= $PAR->{subjobs};
-      my $cores = $cpus/2;
-      print ", allocating $cores core".write_s_if_needed($cores)." and $cpus cpu".write_s_if_needed($cpus);
+      print ", allocating $PAR->{cpus} core".write_s_if_needed($PAR->{cpus});
     }
     if ($PAR->{multinode}) {
       print " across $PAR->{multinode} nodes each";
@@ -697,7 +691,6 @@ sub getCommandLineOptions
     "comment-char=s"    => \$OPT{commentChar}, # comment character
     "no-comment"        => \$OPT{nocomment}, # no comment character
     "evaluate"          => \$OPT{evaluate}, # only keep commands that evaluate as true
-#    "noht"              => \$OPT{noht},     # no hyperthreading # off on Magnus
     'm=s'               => \$OPT{module},  # modules are comma delimited 
     'module=s'          => \$OPT{module},  # modules are comma delimited 
     'err-exit'          => \$OPT{errexit}, # include -e in the shell (requires bash)
@@ -891,9 +884,6 @@ sub getCommandLineOptions
 # Don't allow p to be more than 2
   dieWithError("-p can't be more than 2.") if ($OPT{p} > 2);
 
-# Don't allow hyperthreading, which implies no packing
-#  $SLURMOPT{binary}{"threads-per-core"} = 1; # if ($OPT{noht}); no ht on Magnus
-
 # Set qos
   if ($ENV{SBATCH_QOS} && (not defined $SLURMOPT{binary}{qos})) {
      $SLURMOPT{binary}{qos} = $ENV{SBATCH_QOS};
@@ -1004,9 +994,6 @@ sub getCommandLineOptions
 #==============================================================================
 sub print_options
 {
-  # --noht                 don't use hyperthreading, equivalent to slurm option
-  #                        --threads-per-core=1
-
   print <<EOF;
 Usage: swarm [swarm options] [sbatch options]
 
@@ -1059,7 +1046,7 @@ sbatch options:
   -J, --job-name [str]   set the name of the job
   --dependency [str]     set up dependency (i.e. run swarm before or after)
   --time [str]           change the walltime for each subjob (default is
-                         04:00:00, or 4 hours)
+                         partition default)
   -L,--licenses [str]    obtain software licenses (e.g. --licenses=matlab)
   --account [str]        change the account (default is \$PAWSEY_PROJECT)
   --partition [str]      change the partition (default is workq)
