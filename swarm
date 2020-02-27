@@ -76,7 +76,7 @@ sub setDefaults
 {
   $PAR->{b} = 1; # bundle value of 1
   $PAR->{user} = (getpwuid($>))[0]; # who is this?
-  $PAR->{mygroup} = $ENV{'MYGROUP'}; # default Pawsey group
+  $PAR->{mygroup} = $ENV{'MYGROUP'}; # default Pawsey group directory
   chomp($PAR->{host} = `/bin/hostname`); # where am I?
   $PAR->{pwd} = $ENV{'PWD'}; # what directory is this?
 
@@ -97,7 +97,7 @@ sub setDefaults
   $PAR->{logfile} = "$PAR->{basedir}/logs/swarm.log";
 
 # Keep index of tempdirs
-  $PAR->{tempdir_index} = '$PAR->{mygroup}/logs/swarm_tempdir.idx';
+  $PAR->{tempdir_index} = "$PAR->{basedir}/logs/swarm_tempdir.idx";
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
 # There is no need to keep track of MaxSubmit because swarm will now submit jobarrays.  Each swarm
@@ -107,9 +107,9 @@ sub setDefaults
   $PAR->{maxarraysize} = 1000;
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
-# Currently we have nodes with up to 3000 GB of RAM memory
+# Currently we have nodes with up to 2.5 GB of RAM memory per core
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
-  $PAR->{maxmemsize} = 60000;
+  $PAR->{maxmemsize} = 2.5;
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
 # In addition, we will not be concerned with QOS, as this will be handled downstream by slurm itself.
@@ -263,6 +263,7 @@ sub report
     if ((not defined $OPT{t}) || ($OPT{t} ne 'auto')) {
 # allocating by core, not by cpu
       my $cpus = $SLURMOPT{binary}{"cpus-per-task"};
+      # print "pippo $cpus\n";
       ($cpus%2) && $cpus++;
       $cpus *= $PAR->{subjobs};
       my $cores = $cpus/2;
@@ -506,8 +507,8 @@ sub submitSlurm
 #    exit;
     my $slurm_response = `sbatch $PAR->{sbatch_options} $PAR->{batchfile}`;
     print $slurm_response;
-    if ($slurm_response=~/^(\d+)$/) {
-    #if ($slurm_response=~/Submitted batch job (\d+)/) {
+    #if ($slurm_response=~/^(\d+)$/) {
+    if ($slurm_response=~/Submitted batch job (\d+)/) {
       $PAR->{jobid} = $1;
     }
     else {
@@ -771,11 +772,11 @@ sub getCommandLineOptions
         $SBATCHOPT=~s/${1}${2}//g;
       }
       else {
-        $SLURMOPT{binary}{account} = $ENV{'MYGROUP'};
+        $SLURMOPT{binary}{account} = $ENV{'PAWSEY_PROJECT'};
       }
     }
     else {
-      $SLURMOPT{binary}{account} = $ENV{'MYGROUP'};
+      $SLURMOPT{binary}{account} = $ENV{'PAWSEY_PROJECT'};
     }
   }
 
@@ -891,7 +892,7 @@ sub getCommandLineOptions
   dieWithError("-p can't be more than 2.") if ($OPT{p} > 2);
 
 # Don't allow hyperthreading, which implies no packing
-  $SLURMOPT{binary}{"threads-per-core"} = 1; # if ($OPT{noht}); no ht on Magnus
+#  $SLURMOPT{binary}{"threads-per-core"} = 1; # if ($OPT{noht}); no ht on Magnus
 
 # Set qos
   if ($ENV{SBATCH_QOS} && (not defined $SLURMOPT{binary}{qos})) {
@@ -911,7 +912,7 @@ sub getCommandLineOptions
     dieWithError("-g must be between 0.1 and ".$PAR->{maxmemsize}) if (($OPT{g} <= 0.1) || ($OPT{g} > $PAR->{maxmemsize}));
   }
   else {
-    $OPT{g} = 1.5;
+    $OPT{g} = 2.5;
   }
   $SLURMOPT{binary}{"mem"} = ceil($OPT{g}*1024); 
 
