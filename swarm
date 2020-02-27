@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/bin/perl
 
 # ===========================================================================
 #
@@ -36,13 +36,12 @@ use File::Basename qw/basename/;
 use File::Spec;
 require File::Spec::Unix;
 use File::Path qw(make_path);
-use lib "/usr/local/slurm/lib/perl5/site_perl/5.24.3/x86_64-linux-thread-multi-ld";
+# use lib "/opt/slurm/19.05.5/lib/perl5/site_perl/5.18.2/x86_64-linux-thread-multi";
 use Slurm;
 use FileHandle;
 use strict;
 
 use Sys::Hostname;
-dieWithError("Don't run on helix!  Run on the biowulf cluster!") if (hostname() =~ /helix/);
 
 $SIG{HUP}  = \&catch_sig;
 $SIG{INT}  = \&catch_sig;
@@ -77,11 +76,12 @@ sub setDefaults
 {
   $PAR->{b} = 1; # bundle value of 1
   $PAR->{user} = (getpwuid($>))[0]; # who is this?
+  $PAR->{mygroup} = $ENV{'MYGROUP'}; # default Pawsey group
   chomp($PAR->{host} = `/bin/hostname`); # where am I?
   $PAR->{pwd} = $ENV{'PWD'}; # what directory is this?
 
 # Create the basedir where the batch script and command scripts will be written
-  $PAR->{basedir} = "/spin1/swarm/$PAR->{user}";
+  $PAR->{basedir} = "$PAR->{mygroup}/swarm";
   isDirCreateable($PAR->{basedir}) || dieWithError("can't write to $PAR->{basedir}");
   if (!-d $PAR->{basedir}) {
     mkdir $PAR->{basedir} || dieWithError("Can't create swarm script basedir!");
@@ -94,10 +94,10 @@ sub setDefaults
   $PAR->{commentChar} = '#';
 
 # The logfile which will be updated
-  $PAR->{logfile} = "/usr/local/logs/swarm.log";
+  $PAR->{logfile} = "$PAR->{basedir}/logs/swarm.log";
 
 # Keep index of tempdirs
-  $PAR->{tempdir_index} = '/usr/local/logs/swarm_tempdir.idx';
+  $PAR->{tempdir_index} = '$PAR->{mygroup}/logs/swarm_tempdir.idx';
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
 # There is no need to keep track of MaxSubmit because swarm will now submit jobarrays.  Each swarm
@@ -109,7 +109,7 @@ sub setDefaults
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
 # Currently we have nodes with up to 3000 GB of RAM memory
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
-  $PAR->{maxmemsize} = 3000;
+  $PAR->{maxmemsize} = 60000;
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
 # In addition, we will not be concerned with QOS, as this will be handled downstream by slurm itself.
@@ -123,10 +123,6 @@ sub setDefaults
   my $slurm = Slurm::new();
   my $x = $slurm->load_partitions();
   foreach my $i (@{$x->{partition_array}}) {
-# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
-# Don't allow interactive or huygens partitions
-    next if (($i->{name} eq 'huygens') || ($i->{name} eq 'interactive'));
-# * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
     $PAR->{slurm_partitions}{$i->{name}}{default_time} = $i->{default_time};
     $PAR->{slurm_partitions}{$i->{name}}{max_time} = $i->{max_time};
   }
@@ -289,13 +285,13 @@ sub write_s_if_needed
   else { return ""; }
 }
 #==============================================================================
-sub insertLmodInit
+sub insertModulesInit
 # Insert two lines of code to load modules.  NOTE: This only works in a bash script.  It is meant to be
 # inserted into the batch script, not the command scripts, which may use bash or tcsh to run.
 {
   return unless $OPT{module};
   my $str;
-  $str .= "source /usr/local/lmod/lmod/lmod/init/bash\n";
+#  $str .= "source /opt/cray/pe/modules/default/init/bash\n";
   $str .= "module load $OPT{module}\n";
   return $str;
 }
@@ -375,7 +371,7 @@ sub writeBatchScript
 
 # The swarm.batch file loads the modules, and the command scripts will inherit the environment.  Thie
 # can be screwed up if the user fiddles with the environment within the commands.
-  $fileContents .= insertLmodInit();
+  $fileContents .= insertModulesInit();
 
 # Generate the rest of the batch script.  NOTE: The path to the temporary directory is hard-coded in
 # the swarm.batch script.  This allows a swarm to be rerun, albeit with the correct sbatch options.
@@ -700,7 +696,7 @@ sub getCommandLineOptions
     "comment-char=s"    => \$OPT{commentChar}, # comment character
     "no-comment"        => \$OPT{nocomment}, # no comment character
     "evaluate"          => \$OPT{evaluate}, # only keep commands that evaluate as true
-    "noht"              => \$OPT{noht},     # no hyperthreading 
+#    "noht"              => \$OPT{noht},     # no hyperthreading # off on Magnus
     'm=s'               => \$OPT{module},  # modules are comma delimited 
     'module=s'          => \$OPT{module},  # modules are comma delimited 
     'err-exit'          => \$OPT{errexit}, # include -e in the shell (requires bash)
@@ -731,6 +727,7 @@ sub getCommandLineOptions
 # sbatch options (specific)
     "hint=s"            => \$SLURMOPT{binary}{hint},
     "dependency=s"      => \$SLURMOPT{binary}{dependency},
+    "account=s"         => \$SLURMOPT{binary}{account},
     "partition=s"       => \$SLURMOPT{binary}{partition},
     "reservation=s"     => \$SLURMOPT{binary}{reservation},
     "time=s"            => \$SLURMOPT{binary}{time},
@@ -750,6 +747,37 @@ sub getCommandLineOptions
   print_options() if $OPT{h};
 
   if ($OPT{autobundle}) { print STDERR "WARNING: --autobundle has been deprecated\n"; }
+
+# Default account
+  if (not defined $SLURMOPT{binary}{account}) {
+    if (defined $ENV{SBATCH_ACCOUNT}) {
+      $SLURMOPT{binary}{account} = $ENV{SBATCH_ACCOUNT};
+    }
+    elsif (defined $SBATCHOPT) {
+      if ($SBATCHOPT=~/(^\-\-account\s*=?\s*)(\w+)/) {
+        $SLURMOPT{binary}{account} = $2;
+        $SBATCHOPT=~s/${1}${2}//g;
+      }
+      elsif ($SBATCHOPT=~/(^\-A\s*=?\s*)(\w+)/) {
+        $SLURMOPT{binary}{account} = $2;
+        $SBATCHOPT=~s/${1}${2}//g;
+      }
+      elsif ($SBATCHOPT=~/( \-\-account\s*=?\s*)(\w+)/) {
+        $SLURMOPT{binary}{account} = $2;
+        $SBATCHOPT=~s/${1}${2}//g;
+      }
+      elsif ($SBATCHOPT=~/( \-A\s*=?\s*)(\w+)/) {
+        $SLURMOPT{binary}{account} = $2;
+        $SBATCHOPT=~s/${1}${2}//g;
+      }
+      else {
+        $SLURMOPT{binary}{account} = $ENV{'MYGROUP'};
+      }
+    }
+    else {
+      $SLURMOPT{binary}{account} = $ENV{'MYGROUP'};
+    }
+  }
 
 # Default partition
   if (not defined $SLURMOPT{binary}{partition}) {
@@ -774,11 +802,11 @@ sub getCommandLineOptions
         $SBATCHOPT=~s/${1}${2}//g;
       }
       else {
-        $SLURMOPT{binary}{partition} = "norm";
+        $SLURMOPT{binary}{partition} = "workq";
       }
     }
     else {
-      $SLURMOPT{binary}{partition} = "norm";
+      $SLURMOPT{binary}{partition} = "workq";
     }
   }
 
@@ -863,7 +891,7 @@ sub getCommandLineOptions
   dieWithError("-p can't be more than 2.") if ($OPT{p} > 2);
 
 # Don't allow hyperthreading, which implies no packing
-  $SLURMOPT{binary}{"threads-per-core"} = 1 if ($OPT{noht});
+  $SLURMOPT{binary}{"threads-per-core"} = 1; # if ($OPT{noht}); no ht on Magnus
 
 # Set qos
   if ($ENV{SBATCH_QOS} && (not defined $SLURMOPT{binary}{qos})) {
@@ -881,9 +909,6 @@ sub getCommandLineOptions
 
   if (defined $OPT{g}) { # assign to --mem, converted to MB
     dieWithError("-g must be between 0.1 and ".$PAR->{maxmemsize}) if (($OPT{g} <= 0.1) || ($OPT{g} > $PAR->{maxmemsize}));
-    if (($OPT{g} > 248) && ($SLURMOPT{binary}{partition} ne "largemem")) {
-      dieWithError("-g $OPT{g} requires --partition largemem");
-    }
   }
   else {
     $OPT{g} = 1.5;
@@ -1035,7 +1060,8 @@ sbatch options:
   --time [str]           change the walltime for each subjob (default is
                          04:00:00, or 4 hours)
   -L,--licenses [str]    obtain software licenses (e.g. --licenses=matlab)
-  --partition [str]      change the partition (default is norm)
+  --account [str]        change the account (default is \$PAWSEY_PROJECT)
+  --partition [str]      change the partition (default is workq)
   --gres [str]           set generic resources for swarm
   --qos [str]            set quality of service for swarm
 
@@ -1051,6 +1077,7 @@ Environment variables
   resources:
 
   SBATCH_JOB_NAME        Same as --job-name
+  SBATCH_ACCOUNT         Same as --account
   SBATCH_PARTITION       Same as --partition
   SBATCH_QOS             Same as --qos
   SBATCH_TIMELIMIT       Same as --time
@@ -1112,12 +1139,6 @@ sub validatePartition
 sub adjustTime
 # The timelimit must be changed to account for bundling and/or folding
 {
-# Don't bother if partition is unlimited
-  if ($SLURMOPT{binary}{partition} eq "unlimited") {
-    undef $SLURMOPT{binary}{time};
-    return;
-  }
-
 # Account for multiple partitions
   $PAR->{default_time} = 999999999999; # really long time
   $PAR->{max_time} = 999999999999; # really long time
