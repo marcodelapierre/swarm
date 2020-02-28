@@ -58,6 +58,7 @@ my %SLURMOPT;
 my $SBATCHOPT;
 getCommandLineOptions();
 validatePartition();
+validateAccount();
 parseCommands();
 avoidSbatchCommands();
 distributeCommands();
@@ -77,6 +78,7 @@ sub setDefaults
   $PAR->{b} = 1; # bundle value of 1
   $PAR->{user} = (getpwuid($>))[0]; # who is this?
   $PAR->{mygroup} = $ENV{'MYGROUP'}; # default Pawsey group directory
+  $PAR->{cluster} = $ENV{'PAWSEY_CLUSTER'};
   chomp($PAR->{host} = `/bin/hostname`); # where am I?
   $PAR->{pwd} = $ENV{'PWD'}; # what directory is this?
 
@@ -109,9 +111,9 @@ sub setDefaults
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
 # RAM memory per core depends on the Pawsey system
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
-if ( $ENV{'PAWSEY_CLUSTER'} eq "magnus" ) {
+if ( $PAR->{cluster} eq "magnus" ) {
   $PAR->{maxmemsize} = 2.5;
-} elsif ( $ENV{'PAWSEY_CLUSTER'} eq "zeus" ) {
+} elsif ( $PAR->{cluster} eq "zeus" ) {
   $PAR->{maxmemsize} = 4.3;
 } else { # just some sensible default
   $PAR->{maxmemsize} = 1;
@@ -120,9 +122,9 @@ if ( $ENV{'PAWSEY_CLUSTER'} eq "magnus" ) {
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
 # Number of cores per node depends on the Pawsey system
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
-if ( $ENV{'PAWSEY_CLUSTER'} eq "magnus" ) {
+if ( $PAR->{cluster} eq "magnus" ) {
   $PAR->{corespernode} = 24;
-} elsif ( $ENV{'PAWSEY_CLUSTER'} eq "zeus" ) {
+} elsif ( $PAR->{cluster} eq "zeus" ) {
   $PAR->{corespernode} = 28;
 } else { # just some sensible default
   $PAR->{corespernode} = 16;
@@ -1143,6 +1145,14 @@ sub validatePartition
     dieWithError("Partition '$part' is only valid for multinode jobs") if (($part eq 'ibfdr') && !$PAR->{multinode});
     dieWithError("Partition '$part' is only valid for multinode jobs") if (($part eq 'ibqdr') && !$PAR->{multinode});
   }
+}
+#==============================================================================
+sub validateAccount
+# check the user is associated to the requested account and partition
+{
+  my $acc_found = `sacctmgr show assoc Users=$PAR->{user} Account=$SLURMOPT{binary}{account} Clusters=$PAR->{cluster} Partition=$SLURMOPT{binary}{partition} -n -p | wc -l`;
+  $acc_found = $acc_found + 0;
+  ($acc_found) || dieWithError("Account '$SLURMOPT{binary}{account}' not found or not associated with current user/partition!");
 }
 #==============================================================================
 sub adjustTime
