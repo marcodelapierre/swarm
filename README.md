@@ -2,6 +2,10 @@
 
 Swarm is a script designed to simplify submitting a group of commands to the Biowulf cluster. 
 
+It has been forked from the original NIH one, to run at Pawsey Supercomputing Centre.
+
+The documentation below is yet to be updated for Pawsey. Run `swarm` without arguments to get the updated list of available options.
+
 ## How swarm works
 
 The swarm script accepts a number of input parameters along with a file containing a list of commands that otherwise would be run on the command line.  swarm parses the commands from this file and writes them to a series of command scripts.  Then a single batch script is written to execute these command scripts in a slurm job array, using the user's inputs to guide how slurm allocates resources.

@@ -28,6 +28,8 @@
 # ===========================================================================
 
 # This script is an adaptation of the swarm script for use with SLURM.
+
+# This script has been forked from the original NIH one, to run at Pawsey Supercomputing Centre.
 use Getopt::Long qw(:config no_ignore_case);
 Getopt::Long::Configure("bundling"); # allows option bundling
 use POSIX qw(strftime floor ceil);
