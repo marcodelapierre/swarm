@@ -26,8 +26,8 @@ my %OPT;
 my %PAR;
 my %ERR;
 
-$PAR{delete_index} = "/usr/local/logs/swarm_cleanup.idx"; # index of deleted swarm directories
-$PAR{logfile} = "/usr/local/logs/swarm_cleanup.log"; # logfile
+$PAR{delete_index} = "$PAR->{mygroup}/swarm/logs/swarm_cleanup.idx"; # index of deleted swarm directories
+$PAR{logfile} = "$PAR->{mygroup}/swarm/logs/swarm_cleanup.log"; # logfile
 $PAR{CONFIG} = Config::IniFiles->new( -file => "/usr/local/etc/my.cnf" );
 $PAR{slurm_cnf_group} = "dashboardSlurm"; # the group name for the slurm connection in /usr/local/etc/my.cnf, probably slave
 $PAR{'delete-age'} = 7; # how many days past finishing should we delete the directory?
@@ -282,7 +282,7 @@ EOF
 #==================================================================================================
 sub parse_swarm_index
 {
-  my $f = "/usr/local/logs/swarm_tempdir.idx";
+  my $f = "$PAR->{mygroup}/swarm/logs/swarm_tempdir.idx";
   if (open INDEXFILE, "<$f") {
     print "reading $f\n" if ($OPT{verbose} > 2);
     while (<INDEXFILE>) {
@@ -303,10 +303,10 @@ sub parse_swarm_index
 sub parse_swarm_logs
 {
   my @files;
-  chomp(my $x = `/bin/find /usr/local/logs/swarm_log_archives -type f -mtime -$PAR{max_days_ago}`);
+  chomp(my $x = `/bin/find $PAR->{mygroup}/swarm/logs/swarm_log_archives -type f -mtime -$PAR{max_days_ago}`);
   @files = split /\n/,$x;
   @files = sort @files; 
-  push @files,"/usr/local/logs/swarm.log";
+  push @files,"$PAR->{mygroup}/swarm/logs/swarm.log";
   LOG: foreach my $f (@files) {
     if (open LOGFILE, "<$f") {
       print "reading $f\n" if ($OPT{verbose} > 2);
@@ -334,10 +334,10 @@ sub parse_swarm_logs
 sub parse_sbatch_logs
 {
   my @files;
-  chomp(my $x = `/bin/find /usr/local/logs/sbatch_log_archives -type f -mtime -$PAR{max_days_ago}`);
+  chomp(my $x = `/bin/find $PAR->{mygroup}/swarm/logs/sbatch_log_archives -type f -mtime -$PAR{max_days_ago}`);
   @files = split /\n/,$x;
   @files = sort @files;
-  push @files,"/usr/local/logs/sbatch.log";
+  push @files,"$PAR->{mygroup}/swarm/logs/sbatch.log";
   LOG: foreach my $f (@files) {
     if (open LOGFILE, "<$f") {
       print "reading $f\n" if ($OPT{verbose} > 2);
