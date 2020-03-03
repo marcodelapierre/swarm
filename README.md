@@ -1,6 +1,6 @@
 # Swarm
 
-Swarm is a script designed to simplify submitting a group of commands to the Biowulf cluster. 
+Swarm is a script designed to simplify submitting a group of commands to the Biowulf cluster.
 
 It has been forked from the original NIH one, to run at Pawsey Supercomputing Centre.
 
@@ -9,14 +9,15 @@ It has been forked from the original NIH one, to run at Pawsey Supercomputing Ce
 
 The `swarm` script accepts a number of input parameters along with a file containing a list of commands that otherwise would be run on the command line.  `swarm` parses the commands from this file and writes them to a series of command scripts.  Then a single batch script is written to execute these command scripts in a slurm job array, using the user's inputs to guide how slurm allocates resources.
 
-
-### Bundling versus folding versus packing
+### Bundling versus folding
 
 Bundling a swarm means running two or more commands per subjob serially, uniformly.  For example, if there are 1000 commands in a swarm, and the bundle factor is 5, then each subjob will run 5 commands serially, resulting in 200 subjobs in the job array.
 
-Folding a swarm means running commands serially in a subjob only if the number of subjobs exceed the maximum array size (maxarraysize = 1000).  This is a new concept.  Previously, if a swarm exceeded the maxarraysize, then either the swarm would fail, or the swarm would be autobundled until it fit within the maxarraysize number of subjobs.  Thus, if a swarm had 1001 commands, it would be autobundled with a bundle factor of 2 into 500 subjobs, with 2 commands serially each.  With folding, this would still result in 1000 subjobs, but one subjob would have 2 serial commands, while the rest have 1. Folding was implemented June 21, 2016.
+Folding a swarm means running commands serially in a subjob only if the number of subjobs exceed the maximum array size (maxarraysize = 1000).  This is a new concept.  Previously, if a swarm exceeded the maxarraysize, then either the swarm would fail, or the swarm would be autobundled until it fit within the maxarraysize number of subjobs.  Thus, if a swarm had 1001 commands, it would be autobundled with a bundle factor of 2 into 500 subjobs, with 2 commands serially each.  With folding, this would still result in 1000 subjobs, but one subjob would have 2 serial commands, while the rest have 1.
 
-Finally packing a swarm means running multiple commands per subjob in parallel, by allocating multiple cores and running one command per core. This can be quite useful when running on systems (such as Magnus at Pawsey Supercomputing Centre) where the minimum job allocation is an entire node; packing allows to maximise usage of hardware resources.
+### Packing
+
+Packing a swarm means running multiple commands per subjob in parallel, by allocating multiple cores and running one command per core.  This can be quite useful when running on systems (such as Magnus at Pawsey Supercomputing Centre) where the minimum job allocation is an entire node; packing allows to maximise usage of hardware resources.
 
 
 ## Behind the scenes
@@ -36,13 +37,11 @@ Finally packing a swarm means running multiple commands per subjob in parallel, 
 
 `swarm` (running as the user) first creates a subdirectory within the user's directory with a completely random name.  The command scripts are named `cmd.#`, with `#` being the command index within the job array.  The batch script is simply named `swarm.batch`.  All of these are written into the temporary subdirectory.
 
-
 ### Details about the batch script
 
 The batch script `swarm.batch` hard-codes the path to the temporary subdirectory as the location of the command scripts.  This allows the swarm to be rerun, albeit with the same sbatch options.
 
 The module function is initialized and modules are loaded in the batch script.  This limits the number of times `module load is called to once per swarm, but it also means that the user could overrule the environment within the swarm commands.
-
 
 ### What happens after submission
 
@@ -50,7 +49,7 @@ When a swarm job is successfully submitted to slurm, a jobid is obtained, and a 
 
 If a submission fails, then no symlink will be created.
 
-When a user runs swarm in development mode (`--devel`), no temporary directory or files are created. 
+When a user runs swarm in development mode (`--devel`), no temporary directory or files are created.
 
 
 ## Testing
@@ -70,8 +69,6 @@ Swarm has several options for testing things.
 `--logfile:` A hidden alacarte option, redirects the logfile from the standard logfile to one of your choice.
 
 `--no-scripts:` Don't create command and batch scripts.
-
-In the tests subdirectory, there are two scripts that can be run to test the current build of `swarm`.  `test.sh` runs a series of swarm commands that are expected to succeed, and `fail.sh` runs a series of swarm commands that are expected to fail.  They are run in `--devel` mode, so nothing is ever submitted to the cluster nor logged.
 
 
 ## Logging
