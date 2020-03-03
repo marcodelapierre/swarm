@@ -30,6 +30,7 @@
 # This script is an adaptation of the swarm script for use with SLURM.
 
 # This script has been forked from the original NIH one, to run at Pawsey Supercomputing Centre.
+
 use Getopt::Long qw(:config no_ignore_case);
 Getopt::Long::Configure("bundling"); # allows option bundling
 use POSIX qw(strftime floor ceil);
@@ -38,7 +39,6 @@ use File::Basename qw/basename/;
 use File::Spec;
 require File::Spec::Unix;
 use File::Path qw(make_path);
-# use lib "/opt/slurm/19.05.5/lib/perl5/site_perl/5.18.2/x86_64-linux-thread-multi";
 use Slurm;
 use FileHandle;
 use strict;
@@ -80,16 +80,22 @@ sub setDefaults
   $PAR->{b} = 1; # bundle value of 1
   $PAR->{user} = (getpwuid($>))[0]; # who is this?
   $PAR->{mygroup} = $ENV{'MYGROUP'}; # default Pawsey group directory
-  $PAR->{cluster} = $ENV{'PAWSEY_CLUSTER'};
+  $PAR->{cluster} = $ENV{'PAWSEY_CLUSTER'}; # Pawsey cluster I am using
   chomp($PAR->{host} = `/bin/hostname`); # where am I?
   $PAR->{pwd} = $ENV{'PWD'}; # what directory is this?
 
 # Create the basedir where the batch script and command scripts will be written
-  $PAR->{basedir} = "$PAR->{mygroup}/swarm";
+  $PAR->{basedir} = "$PAR->{mygroup}/swarm_$PAR->{cluster}";
   isDirCreateable($PAR->{basedir}) || dieWithError("can't write to $PAR->{basedir}");
   if (!-d $PAR->{basedir}) {
     mkdir $PAR->{basedir} || dieWithError("Can't create swarm script basedir!");
     chmod 02750,$PAR->{basedir};
+  }
+# Also create the logs dir
+  $PAR->{logsdir} = "$PAR->{basedir}/logs";
+  if (!-d $PAR->{logsdir}) {
+    mkdir $PAR->{logsdir} || dieWithError("Can't create swarm script logs dir!");
+    chmod 02750,$PAR->{logsdir};
   }
 
 # Other defaults
@@ -98,10 +104,10 @@ sub setDefaults
   $PAR->{commentChar} = '#';
 
 # The logfile which will be updated
-  $PAR->{logfile} = "$PAR->{basedir}/logs/swarm.log";
+  $PAR->{logfile} = "$PAR->{logsdir}/swarm.log";
 
 # Keep index of tempdirs
-  $PAR->{tempdir_index} = "$PAR->{basedir}/logs/swarm_tempdir.idx";
+  $PAR->{tempdir_index} = "$PAR->{logsdir}/swarm_tempdir.idx";
 
 # * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * 
 # There is no need to keep track of MaxSubmit because swarm will now submit jobarrays.  Each swarm
@@ -1117,6 +1123,7 @@ sub writeLog
           . "jobid="      .$PAR->{jobid}           ."; "
           . "user="       .$PAR->{user}            ."; "
           . "mygroup="    .$PAR->{mygroup}         ."; "
+          . "cluster="    .$PAR->{cluster}         ."; "
           . "pwd="        .$PAR->{pwd}             ."; "
           . "ncmds="      .$PAR->{commands}        ."; "
           . "soptions="   .$x                      ."; "
