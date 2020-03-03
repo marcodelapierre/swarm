@@ -79,13 +79,13 @@ sub setDefaults
 {
   $PAR->{b} = 1; # bundle value of 1
   $PAR->{user} = (getpwuid($>))[0]; # who is this?
-  $PAR->{mygroup} = $ENV{'MYGROUP'}; # default Pawsey group directory
+  $PAR->{myscratch} = $ENV{'MYSCRATCH'}; # default Pawsey group directory
   $PAR->{cluster} = $ENV{'PAWSEY_CLUSTER'}; # Pawsey cluster I am using
   chomp($PAR->{host} = `/bin/hostname`); # where am I?
   $PAR->{pwd} = $ENV{'PWD'}; # what directory is this?
 
 # Create the basedir where the batch script and command scripts will be written
-  $PAR->{basedir} = "$PAR->{mygroup}/swarm_$PAR->{cluster}";
+  $PAR->{basedir} = "$PAR->{myscratch}/swarm_$PAR->{cluster}";
   isDirCreateable($PAR->{basedir}) || dieWithError("can't write to $PAR->{basedir}");
   if (!-d $PAR->{basedir}) {
     mkdir $PAR->{basedir} || dieWithError("Can't create swarm script basedir!");
@@ -1101,7 +1101,7 @@ Environment variables
   SBATCH_TIMELIMIT       Same as --time
   SBATCH_EXCLUSIVE       Same as --exclusive
 
-  Last modification date: Mar 22, 2018
+  Last modification date: 3 March 2020
 EOF
   exit;
 }
@@ -1122,7 +1122,7 @@ sub writeLog
           . "host="       .$PAR->{host}            ."; "
           . "jobid="      .$PAR->{jobid}           ."; "
           . "user="       .$PAR->{user}            ."; "
-          . "mygroup="    .$PAR->{mygroup}         ."; "
+          . "myscratch="    .$PAR->{myscratch}         ."; "
           . "cluster="    .$PAR->{cluster}         ."; "
           . "pwd="        .$PAR->{pwd}             ."; "
           . "ncmds="      .$PAR->{commands}        ."; "
