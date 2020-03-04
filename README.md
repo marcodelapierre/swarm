@@ -2,22 +2,34 @@
 
 Swarm is a script designed to simplify submitting a group of commands to the Biowulf cluster.
 
-It has been forked from the original NIH one, to run at Pawsey Supercomputing Centre.
+This version has been forked from the original NIH one, to run at Pawsey Supercomputing Centre.
+
+
+## Quick start
+
+Suppose inyour work directory you have a text file called `list`, that contains a long list of serial commands to be executed through Slurm.
+
+* To run them as one job/one core per command type: `swarm -f list`
+* To run as job packs, to fill entire nodes of the cluster, run: `swarm -f list -p auto`
+
+You can set memory and thread requirements using `-g` and `-t`, respectively.  Multi-threaded swarms are currently not compatible with multi-packed swarms.
+
+Run `swarm -h` for additional options.
 
 
 ## How swarm works
 
 The `swarm` script accepts a number of input parameters along with a file containing a list of commands that otherwise would be run on the command line.  `swarm` parses the commands from this file and writes them to a series of command scripts.  Then a single batch script is written to execute these command scripts in a slurm job array, using the user's inputs to guide how slurm allocates resources.
 
+### Packing
+
+Packing a swarm means running multiple commands per subjob in parallel, by allocating multiple cores and running one command per core.  This can be quite useful when running on systems (such as Magnus at Pawsey Supercomputing Centre) where the minimum job allocation is an entire node; packing allows to maximise usage of hardware resources.
+
 ### Bundling versus folding
 
 Bundling a swarm means running two or more commands per subjob serially, uniformly.  For example, if there are 1000 commands in a swarm, and the bundle factor is 5, then each subjob will run 5 commands serially, resulting in 200 subjobs in the job array.
 
-Folding a swarm means running commands serially in a subjob only if the number of subjobs exceed the maximum array size (maxarraysize = 1000).  This is a new concept.  Previously, if a swarm exceeded the maxarraysize, then either the swarm would fail, or the swarm would be autobundled until it fit within the maxarraysize number of subjobs.  Thus, if a swarm had 1001 commands, it would be autobundled with a bundle factor of 2 into 500 subjobs, with 2 commands serially each.  With folding, this would still result in 1000 subjobs, but one subjob would have 2 serial commands, while the rest have 1.
-
-### Packing
-
-Packing a swarm means running multiple commands per subjob in parallel, by allocating multiple cores and running one command per core.  This can be quite useful when running on systems (such as Magnus at Pawsey Supercomputing Centre) where the minimum job allocation is an entire node; packing allows to maximise usage of hardware resources.
+Folding a swarm means running commands serially in a subjob only if the number of subjobs exceed the maximum array size (`maxarraysize` = 1000).  This is a new concept.  Previously, if a swarm exceeded the `maxarraysize`, then either the swarm would fail, or the swarm would be autobundled until it fit within the `maxarraysize` number of subjobs.  Thus, if a swarm had 1001 commands, it would be autobundled with a bundle factor of 2 into 500 subjobs, with 2 commands serially each.  With folding, this would still result in 1000 subjobs, but one subjob would have 2 serial commands, while the rest have 1.
 
 
 ## Behind the scenes

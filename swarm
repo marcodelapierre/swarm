@@ -950,10 +950,10 @@ sub getCommandLineOptions
   $SLURMOPT{binary}{"mem"} = ceil($OPT{g}*1024); 
 
 # After getopts, argv should be -1 for this script.
-  dieWithError("excess commandline arguments (@ARGV). See $PAR->{programname} --help") if ($#ARGV > -1 || $#ARGV < -1);
+  dieWithError("excess commandline arguments (@ARGV). See swarm -h / --help") if ($#ARGV > -1 || $#ARGV < -1);
 
 # Also, swarm MUST be called with -f option
-  dieWithError("must specify '-f cmdfile'  See $PAR->{programname} --help") if !$OPT{f};
+  dieWithError("must specify '-f cmdfile'.  See swarm -h / --help") if !$OPT{f};
 
   $PAR->{Commandfile} = $OPT{f};
 
