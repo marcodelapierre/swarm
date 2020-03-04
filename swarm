@@ -717,8 +717,8 @@ sub getCommandLineOptions
     "gb-per-process=f"  => \$OPT{g},
     "t=s"               => \$OPT{t},
     "threads-per-process=s" => \$OPT{t},
-    "p=i"               => \$OPT{p},      # run 2 commands per core for single threaded bundled swarms 
-    "processes-per-subjob=i"  => \$OPT{p},      # run 2 commands per core for single threaded bundled swarms 
+    "p=i"               => \$OPT{p},      # job packing for single threaded bundled swarms 
+    "processes-per-subjob=i"  => \$OPT{p},      # job packing for single threaded bundled swarms 
     "usecsh"            => \$OPT{usecsh},    # use tcsh shell instead of bash
     "comment-char=s"    => \$OPT{commentChar}, # comment character
     "no-comment"        => \$OPT{nocomment}, # no comment character
@@ -892,7 +892,8 @@ sub getCommandLineOptions
     else {
 # Don't be stupid
       dieWithError("-t must be either a number or \"auto\"") if !($OPT{t}=~/^\d+$/ || $OPT{t} eq "auto");
-      dieWithError("-t must be either a number >=1") if ($OPT{t} < 1);
+      dieWithError("-t must be >= 1") if ($OPT{t} < 1);
+      dieWithError("-t must be <= corespernode") if ($OPT{t} > $PAR->{corespernode});
       $SLURMOPT{binary}{"cpus-per-task"} = $OPT{t};
     }
   }
@@ -910,9 +911,10 @@ sub getCommandLineOptions
       dieWithError("-t is for multi-threaded or multi-node commands, -p is for single-threaded commands.  Use one or the other!");
     }
   }
-  undef $OPT{p} if ($OPT{p} <= 1);
-# Don't allow p to be more than 2
-#  dieWithError("-p can't be more than 2.") if ($OPT{p} > 2);
+  
+  dieWithError("-p must be >= 1") if ($OPT{p} < 1);
+  dieWithError("-p must be <= corespernode") if ($OPT{p} > $PAR->{corespernode});
+  undef $OPT{p} if ($OPT{p} == 1);
 
 # Set qos
   if ($ENV{SBATCH_QOS} && (not defined $SLURMOPT{binary}{qos})) {
@@ -1284,7 +1286,7 @@ sub catch_sig
 sub append_to_tempdir_index
 {
   my $p = 1;
-  $p = 2 if ($OPT{p} == 2);
+  $p = $OPT{p} if (defined $OPT{p});
   my $fileContents = time().",$PAR->{user},$PAR->{tempname},$PAR->{subjobs},$p\n";
   appendToFile($PAR->{tempdir_index},$fileContents);
   chmod 0666, $PAR->{tempdir_index};
