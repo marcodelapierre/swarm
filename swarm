@@ -230,9 +230,13 @@ sub report
 # Calculate total number of cpus allocated
   $PAR->{cpus} = $PAR->{subjobs};
   if (defined $OPT{p}) {
-    $PAR->{cpus} *= $OPT{p};
+    if ( $OPT{p} eq "auto" ) {
+      $PAR->{cpus} *= $PAR->{corespernode};
+    } else {
+      $PAR->{cpus} *= $OPT{p};
+    }
   }
-  elsif ( $OPT{t} ) {
+  elsif (defined $OPT{t}) {
     if ( $OPT{t} eq "auto" ) {
       $PAR->{cpus} *= $PAR->{corespernode};
     } else {
@@ -717,8 +721,8 @@ sub getCommandLineOptions
     "gb-per-process=f"  => \$OPT{g},
     "t=s"               => \$OPT{t},
     "threads-per-process=s" => \$OPT{t},
-    "p=i"               => \$OPT{p},      # job packing for single threaded bundled swarms 
-    "processes-per-subjob=i"  => \$OPT{p},      # job packing for single threaded bundled swarms 
+    "p=s"               => \$OPT{p},      # job packing for single threaded bundled swarms 
+    "processes-per-subjob=s"  => \$OPT{p},      # job packing for single threaded bundled swarms 
     "usecsh"            => \$OPT{usecsh},    # use tcsh shell instead of bash
     "comment-char=s"    => \$OPT{commentChar}, # comment character
     "no-comment"        => \$OPT{nocomment}, # no comment character
@@ -913,9 +917,14 @@ sub getCommandLineOptions
   }
   
   if (defined $OPT{p}) {
-    dieWithError("-p must be >= 1") if ($OPT{p} < 1);
-    dieWithError("-p must be <= $PAR->{corespernode} on $PAR->{cluster}") if ($OPT{p} > $PAR->{corespernode});
-    undef $OPT{p} if ($OPT{p} == 1);
+    if ($OPT{p} eq "auto") {
+      $OPT{p} = $PAR->{corespernode};
+    } else {
+      dieWithError("-p must be either a number or \"auto\"") if !($OPT{p}=~/^\d+$/ || $OPT{p} eq "auto");
+      dieWithError("-p must be >= 1") if ($OPT{p} < 1);
+      dieWithError("-p must be <= $PAR->{corespernode} on $PAR->{cluster}") if ($OPT{p} > $PAR->{corespernode});
+      undef $OPT{p} if ($OPT{p} == 1);
+    }
   }
 
 # Set qos
@@ -1037,14 +1046,14 @@ Usage: swarm [swarm options] [sbatch options]
   -g,--gb-per-process    gb per process (can be fractions of GB, e.g. 3.5)
   [float]
 
-  -t,                    threads per process (can be an integer or the word
-  --threads-per-process  auto).  This option is only valid for multi-
-  [int]/"auto"           threaded swarms (-p 1).
+  -t,                    threads per process (default = 1).  Can be an integer
+  --threads-per-process  or the word "auto".  This option is only valid for
+  [int]/"auto"           single-packed swarms (-p 1).
 
-  -p,                    processes per subjob (default = 1).  This option is
-  --processes-per-subjob only valid for single-threaded swarms (-t 1).
-  [int]                  
-                      
+  -p,                    processes per subjob (default = 1).  Can be an integer
+  --processes-per-subjob or the word "auto".  This option is only valid for
+  [int]/"auto"           single-threaded swarms (-t 1).
+
   -b,--bundle [int]      bundle more than one command line per subjob and run
                          sequentially (this automatically multiplies the time
                          needed per subjob)
