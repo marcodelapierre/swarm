@@ -892,8 +892,7 @@ sub getCommandLineOptions
     else {
 # Don't be stupid
       dieWithError("-t must be either a number or \"auto\"") if !($OPT{t}=~/^\d+$/ || $OPT{t} eq "auto");
-      print "pippo $OPT{t}\n";
-      dieWithError("-t must be >= 1") if ($OPT{t} < "1");
+      dieWithError("-t must be >= 1") if ($OPT{t} < 1);
       dieWithError("-t must be <= $PAR->{corespernode} on $PAR->{cluster}") if ($OPT{t} > $PAR->{corespernode});
       $SLURMOPT{binary}{"cpus-per-task"} = $OPT{t};
     }
@@ -908,15 +907,15 @@ sub getCommandLineOptions
 
 # pack only allowed for single threaded swarms 
   if (defined $OPT{t} && defined $OPT{p}) {
-    if (($OPT{t} > "1" || $OPT{t} eq "auto") && ($OPT{p} > "1")) {
+    if (($OPT{t} > 1 || $OPT{t} eq "auto") && ($OPT{p} > 1)) {
       dieWithError("-t is for multi-threaded or multi-node commands, -p is for single-threaded commands.  Use one or the other!");
     }
   }
   
   if (defined $OPT{p}) {
-    dieWithError("-p must be >= 1") if ($OPT{p} < "1");
+    dieWithError("-p must be >= 1") if ($OPT{p} < 1);
     dieWithError("-p must be <= $PAR->{corespernode} on $PAR->{cluster}") if ($OPT{p} > $PAR->{corespernode});
-    undef $OPT{p} if ($OPT{p} == "1");
+    undef $OPT{p} if ($OPT{p} == 1);
   }
 
 # Set qos
